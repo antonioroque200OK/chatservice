@@ -3,14 +3,17 @@ package chatcompletionstream
 import (
 	"context"
 	"errors"
+	"io"
+	"strings"
 
+	"github.com/antonioroque200OK/chatservice/internal/domain/entity"
 	"github.com/antonioroque200OK/chatservice/internal/domain/gateway"
 	"github.com/sashabaranov/go-openai"
 )
 
 type ChatCompletionConfigInputDto struct {
 	Model               string
-	ModelMaxString      int
+	ModelMaxTokenx      int
 	Temperature         float32
 	TopP                float32
 	N                   int
@@ -37,12 +40,14 @@ type ChatCompletionOutputDto struct {
 type ChatCompletionUseCase struct {
 	ChatGateway  gateway.ChatGateway
 	OpenAiClient *openai.Client
+	Stream       chan ChatCompletionOutputDto
 }
 
-func NewChatCompletionUseCase(chatGateway gateway.ChatGateway, openAiClient *openai.Client) *ChatCompletionUseCase {
+func NewChatCompletionUseCase(chatGateway gateway.ChatGateway, openAiClient *openai.Client, stream chan ChatCompletionOutputDto) *ChatCompletionUseCase {
 	return &ChatCompletionUseCase{
 		ChatGateway:  chatGateway,
 		OpenAiClient: openAiClient,
+		Stream:       stream,
 	}
 }
 
@@ -51,7 +56,6 @@ func (uc *ChatCompletionUseCase) Execute(ctx context.Context, input ChatCompleti
 	if err != nil {
 		if err.Error() == "chat not found" {
 			// * create new chat (entity)
-			// TODO: implemet 'createNewChat'
 			chat, err = createNewChat(input)
 			if err != nil {
 				return nil, errors.New("error creating new chat: " + err.Error())
@@ -65,4 +69,100 @@ func (uc *ChatCompletionUseCase) Execute(ctx context.Context, input ChatCompleti
 			return nil, errors.New("error fetching chat: " + err.Error())
 		}
 	}
+	userMessage, err := entity.NewMessage("user", input.UserMessage, chat.Config.Model)
+	if err != nil {
+		return nil, errors.New("error creating user message: " + err.Error())
+	}
+	err = chat.AddMessage(userMessage)
+	if err != nil {
+		return nil, errors.New("error adding new message: " + err.Error())
+	}
+	messages := []openai.ChatCompletionMessage{}
+	for _, msg := range chat.Messages {
+		messages = append(messages, openai.ChatCompletionMessage{
+			Role:    msg.Role,
+			Content: msg.Content,
+		})
+	}
+
+	resp, err := uc.OpenAiClient.CreateChatCompletionStream(
+		ctx,
+		openai.ChatCompletionRequest{
+			Model:            chat.Config.Model.Name,
+			Messages:         messages,
+			MaxTokens:        chat.Config.MaxTokens,
+			Temperature:      chat.Config.Temperature,
+			TopP:             chat.Config.TopP,
+			PresencePenalty:  chat.Config.PresencePenalty,
+			FrequencyPenalty: chat.Config.FrequencyPenalty,
+			Stop:             chat.Config.Stop,
+			Stream:           true,
+		},
+	)
+	if err != nil {
+		return nil, errors.New("error creating chat completion " + err.Error())
+	}
+
+	var fullResponse strings.Builder
+
+	for {
+		response, err := resp.Recv()
+		if errors.Is(err, io.EOF) {
+			break
+		}
+		if err != nil {
+			return nil, errors.New("error streaming response " + err.Error())
+		}
+		fullResponse.WriteString(response.Choices[0].Delta.Content)
+		r := ChatCompletionOutputDto{
+			ChatID:  chat.ID,
+			UserID:  input.UserID,
+			Content: fullResponse.String(),
+		}
+		uc.Stream <- r
+	}
+
+	assistant, err := entity.NewMessage("assistant", fullResponse.String(), chat.Config.Model)
+	if err != nil {
+		return nil, errors.New("error creating assistant message: " + err.Error())
+	}
+	err = chat.AddMessage(assistant)
+	if err != nil {
+		return nil, errors.New("error adding new message: " + err.Error())
+	}
+
+	err = uc.ChatGateway.Save(ctx, chat)
+	if err != nil {
+		return nil, errors.New("error saving chat: " + err.Error())
+	}
+	return &ChatCompletionOutputDto{
+		ChatID:  chat.ID,
+		UserID:  input.UserID,
+		Content: fullResponse.String(),
+	}, nil
+}
+
+// Acts like a factory function
+func createNewChat(input ChatCompletionInputDto) (*entity.Chat, error) {
+	// TODO: check properties of entity.NewModel
+	model := entity.NewModel(input.Config.Model, input.Config.ModelMaxTokenx)
+	chatConfig := &entity.ChatConfig{
+		Temperature:      input.Config.Temperature,
+		TopP:             input.Config.TopP,
+		N:                input.Config.N,
+		Stop:             input.Config.Stop,
+		MaxTokens:        input.Config.MaxTokens,
+		PresencePenalty:  input.Config.PresencePenalty,
+		FrequencyPenalty: input.Config.FrequencyPenalty,
+		Model:            model,
+	}
+	initialMessage, err := entity.NewMessage("system", input.Config.InitalSystemMessage, model)
+	if err != nil {
+		return nil, errors.New("error creating initial message: " + err.Error())
+	}
+	chat, err := entity.NewChat(input.UserID, initialMessage, chatConfig)
+	if err != nil {
+		return nil, errors.New("error creating new chat: " + err.Error())
+	}
+	return chat, nil
 }
