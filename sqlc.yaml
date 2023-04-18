@@ -8,6 +8,6 @@ sql:
               package: "db"
               out: "internal/infra/db"
               overrides:
-                  - db_type: "decima"
+                  - db_type: "decimal"
                     go_type: "float64"
 
