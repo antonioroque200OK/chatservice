@@ -16,13 +16,13 @@ type Chat struct {
 	TokenUsage       int32
 	Model            string
 	ModelMaxTokens   int32
-	Temperature      string
-	TopP             string
+	Temperature      float64
+	TopP             float64
 	N                int32
 	Stop             string
 	MaxTokens        int32
-	PresencePenalty  string
-	FrequencyPenalty string
+	PresencePenalty  float64
+	FrequencyPenalty float64
 	CreatedAt        time.Time
 	UpdatedAt        time.Time
 }
