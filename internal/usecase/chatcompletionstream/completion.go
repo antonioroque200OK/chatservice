@@ -13,7 +13,7 @@ import (
 
 type ChatCompletionConfigInputDto struct {
 	Model               string
-	ModelMaxTokenx      int
+	ModelMaxTokens      int
 	Temperature         float32
 	TopP                float32
 	N                   int
@@ -144,7 +144,6 @@ func (uc *ChatCompletionUseCase) Execute(ctx context.Context, input ChatCompleti
 
 // Acts like a factory function
 func createNewChat(input ChatCompletionInputDto) (*entity.Chat, error) {
-	// TODO: check properties of entity.NewModel
 	model := entity.NewModel(input.Config.Model, input.Config.ModelMaxTokenx)
 	chatConfig := &entity.ChatConfig{
 		Temperature:      input.Config.Temperature,
