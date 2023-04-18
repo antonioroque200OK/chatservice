@@ -115,32 +115,84 @@ func (q *Queries) CreateChat(ctx context.Context, arg CreateChatParams) error {
 	return err
 }
 
-const findChatByID = `-- name: FindChatByID :one
-SELECT id, user_id, initial_message_id, status, token_usage, model, model_max_tokens, temperature, top_p, n, stop, max_tokens, presence_penalty, frequency_penalty, created_at, updated_at
-FROM chats
-WHERE id = ?
+const findErasedMessagesByChatID = `-- name: FindErasedMessagesByChatID :many
+SELECT id, chat_id, role, content, tokens, model, erased, order_msg, created_at
+FROM messages
+WHERE erased = 1
+    and chat_id = ?
+order by order_msg asc
 `
 
-func (q *Queries) FindChatByID(ctx context.Context, id string) (Chat, error) {
-	row := q.db.QueryRowContext(ctx, findChatByID, id)
-	var i Chat
-	err := row.Scan(
-		&i.ID,
-		&i.UserID,
-		&i.InitialMessageID,
-		&i.Status,
-		&i.TokenUsage,
-		&i.Model,
-		&i.ModelMaxTokens,
-		&i.Temperature,
-		&i.TopP,
-		&i.N,
-		&i.Stop,
-		&i.MaxTokens,
-		&i.PresencePenalty,
-		&i.FrequencyPenalty,
-		&i.CreatedAt,
-		&i.UpdatedAt,
-	)
-	return i, err
+func (q *Queries) FindErasedMessagesByChatID(ctx context.Context, chatID string) ([]Message, error) {
+	rows, err := q.db.QueryContext(ctx, findErasedMessagesByChatID, chatID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []Message
+	for rows.Next() {
+		var i Message
+		if err := rows.Scan(
+			&i.ID,
+			&i.ChatID,
+			&i.Role,
+			&i.Content,
+			&i.Tokens,
+			&i.Model,
+			&i.Erased,
+			&i.OrderMsg,
+			&i.CreatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const findMessagesByChatID = `-- name: FindMessagesByChatID :many
+SELECT id, chat_id, role, content, tokens, model, erased, order_msg, created_at
+FROM messages
+WHERE erased = 0
+    and chat_id = ?
+order by order_msg asc
+`
+
+func (q *Queries) FindMessagesByChatID(ctx context.Context, chatID string) ([]Message, error) {
+	rows, err := q.db.QueryContext(ctx, findMessagesByChatID, chatID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []Message
+	for rows.Next() {
+		var i Message
+		if err := rows.Scan(
+			&i.ID,
+			&i.ChatID,
+			&i.Role,
+			&i.Content,
+			&i.Tokens,
+			&i.Model,
+			&i.Erased,
+			&i.OrderMsg,
+			&i.CreatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }

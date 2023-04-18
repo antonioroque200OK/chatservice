@@ -31,7 +31,15 @@ INSERT INTO messages (
         created_at
     )
 VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?);
--- name: FindChatByID :one
+-- name: FindMessagesByChatID :many
 SELECT *
-FROM chats
-WHERE id = ?
+FROM messages
+WHERE erased = 0
+    and chat_id = ?
+order by order_msg asc;
+-- name: FindErasedMessagesByChatID :many
+SELECT *
+FROM messages
+WHERE erased = 1
+    and chat_id = ?
+order by order_msg asc;
