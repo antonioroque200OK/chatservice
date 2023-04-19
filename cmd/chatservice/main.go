@@ -5,10 +5,12 @@ import (
 	"fmt"
 
 	"github.com/antonioroque200OK/chatservice/configs"
+	"github.com/antonioroque200OK/chatservice/internal/infra/grpc/server"
 	"github.com/antonioroque200OK/chatservice/internal/infra/repository"
 	"github.com/antonioroque200OK/chatservice/internal/infra/web"
 	"github.com/antonioroque200OK/chatservice/internal/infra/web/webserver"
 	"github.com/antonioroque200OK/chatservice/internal/usecase/chatcompletion"
+	"github.com/antonioroque200OK/chatservice/internal/usecase/chatcompletionstream"
 	_ "github.com/go-sql-driver/mysql"
 	"github.com/sashabaranov/go-openai"
 )
@@ -40,30 +42,30 @@ func main() {
 		InitialSystemMessage: configs.InitialChatMessage,
 	}
 
-	// chatConfigStream := chatcompletionstream.ChatCompletionConfigInputDto{
-	// 	Model:               configs.Model,
-	// 	ModelMaxTokens:      configs.ModelMaxTokens,
-	// 	Temperature:         float32(configs.Temperature),
-	// 	TopP:                float32(configs.TopP),
-	// 	N:                   configs.N,
-	// 	Stop:                configs.Stop,
-	// 	MaxTokens:           configs.MaxTokens,
-	// 	InitalSystemMessage: configs.InitialChatMessage,
-	// }
+	chatConfigStream := chatcompletionstream.ChatCompletionConfigInputDto{
+		Model:               configs.Model,
+		ModelMaxTokens:      configs.ModelMaxTokens,
+		Temperature:         float32(configs.Temperature),
+		TopP:                float32(configs.TopP),
+		N:                   configs.N,
+		Stop:                configs.Stop,
+		MaxTokens:           configs.MaxTokens,
+		InitalSystemMessage: configs.InitialChatMessage,
+	}
 
 	usecase := chatcompletion.NewChatCompletionUseCase(repo, client)
-	// streamChannel := make(chan chatcompletionstream.ChatCompletionOutputDto)
-	// usecaseStream := chatcompletionstream.NewChatCompletionUseCase(repo, client, streamChannel)
+	streamChannel := make(chan chatcompletionstream.ChatCompletionOutputDto)
+	usecaseStream := chatcompletionstream.NewChatCompletionUseCase(repo, client, streamChannel)
 
-	// fmt.Println("Starting gRPC server on port " + configs.GRPCServerPort)
-	// grpcServer := server.NewGRPCServer(
-	// 	*usecaseStream,
-	// 	chatConfigStream,
-	// 	configs.GRPCServerPort,
-	// 	configs.AuthToken,
-	// 	streamChannel,
-	// )
-	// go grpcServer.Start()
+	fmt.Println("Starting gRPC server on port " + configs.GRPCServerPort)
+	grpcServer := server.NewGRPCServer(
+		*usecaseStream,
+		chatConfigStream,
+		configs.GRPCServerPort,
+		configs.AuthToken,
+		streamChannel,
+	)
+	go grpcServer.Start()
 
 	webserver := webserver.NewWebServer(":" + configs.WebServerPort)
 	webserverChatHandler := web.NewWebChatGPTHandler(*usecase, chatConfig, configs.AuthToken)
