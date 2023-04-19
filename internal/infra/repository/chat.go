@@ -66,7 +66,7 @@ func (r *ChatRepositoryMySQL) CreateChat(ctx context.Context, chat *entity.Chat)
 	return nil
 }
 
-func (r *ChatRepositoryMySQL) FindChatByID(ctx context.Context, chatID string) (*entity.Chat, error) {
+func (r *ChatRepositoryMySQL) FindChatById(ctx context.Context, chatID string) (*entity.Chat, error) {
 	chat := &entity.Chat{}
 	res, err := r.Queries.FindChatByID(ctx, chatID)
 	if err != nil {

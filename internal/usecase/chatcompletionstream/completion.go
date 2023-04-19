@@ -131,7 +131,7 @@ func (uc *ChatCompletionUseCase) Execute(ctx context.Context, input ChatCompleti
 		return nil, errors.New("error adding new message: " + err.Error())
 	}
 
-	err = uc.ChatGateway.Save(ctx, chat)
+	err = uc.ChatGateway.SaveChat(ctx, chat)
 	if err != nil {
 		return nil, errors.New("error saving chat: " + err.Error())
 	}
@@ -144,7 +144,7 @@ func (uc *ChatCompletionUseCase) Execute(ctx context.Context, input ChatCompleti
 
 // Acts like a factory function
 func createNewChat(input ChatCompletionInputDto) (*entity.Chat, error) {
-	model := entity.NewModel(input.Config.Model, input.Config.ModelMaxTokenx)
+	model := entity.NewModel(input.Config.Model, input.Config.ModelMaxTokens)
 	chatConfig := &entity.ChatConfig{
 		Temperature:      input.Config.Temperature,
 		TopP:             input.Config.TopP,

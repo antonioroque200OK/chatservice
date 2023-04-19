@@ -107,7 +107,7 @@ func (uc *ChatCompletionUseCase) Execute(ctx context.Context, input ChatCompleti
 		return nil, err
 	}
 
-	err = uc.ChatGateway.Save(ctx, chat)
+	err = uc.ChatGateway.SaveChat(ctx, chat)
 	if err != nil {
 		return nil, err
 	}
